@@ -1,0 +1,4 @@
+# This is the cache file for the autologin program
+# if you want to add a message for test usage, please use "sudo" to make the message readable for the program
+
+
