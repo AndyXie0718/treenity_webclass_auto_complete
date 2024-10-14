@@ -440,7 +440,7 @@ try:
     #time.sleep(60*60)
 except Exception as e:
     #print(f"发生错误: {e}")
-    write_to_cache("{}\n发生错误! 当前进度_{}, 已经播放{}分钟".format(e, present_title_temp, TotalTime))
+    write_to_cache("{}\n{}: 发生错误! 当前进度_{}, 已经播放{}分钟".format(datetime.now().strftime('%Y-%m-%d %H:%M:%S'), e, present_title_temp, TotalTime))
 
 # 关闭浏览器实例
 driver.quit()

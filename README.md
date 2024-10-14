@@ -4,3 +4,6 @@ fixed few bugs when facing exceptions
 
 # develop 1.2.2
 fixed bugs when reading cache
+
+# develop 1.2.3
+fixed fatal bugs while reading last crash message and getting the playtime from it
