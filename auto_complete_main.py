@@ -303,7 +303,7 @@ def read_the_last_line_of_cache():
         lines = file.readlines()
     
     for line in reversed(lines):
-        if line.find("今日规律学习目标完成!") != -1 or line.find("发生错误") != -1 or line.find("sudo"):
+        if line.find("今日规律学习目标完成!") != -1 or line.find("发生错误") != -1 or line.find("sudo") != -1:
             return line.strip()  # 返回最后一行内容并去除换行符
     print("Cache Not Found, Start From DeFault _1.1")
     return "[Warning] Cache Not Found, Start From DeFault _1.1"
