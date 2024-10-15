@@ -138,16 +138,16 @@ def move(distance):
 
     action.drag_and_drop_by_offset(ele, xoffset=distance, yoffset=0).perform()
 
-    # # 定位到验证成功
-    # #这里 如果写time.sleep(2)会匹配失败，具体原因不知道
-    # time.sleep(1)
-    # loc = '.yidun_tips__text.yidun-fallback__tip'
-    # text = driver.find_element('css selector',loc).text
+def check_if_redirected(driver, initial_url, timeout, interval):
+    init_time = 0
+    while init_time < timeout:
+        if driver.current_url != initial_url:
+            write_to_cache("登录成功！正在跳转至学习网址...")
+            return True
 
-    # if text == "验证成功":
-    #     print("验证成功")
-    # else:
-    #     print("验证失败")
+        time.sleep(interval)
+        init_time += interval
+    return False
 
 def play_video():
     # 旧思路: 根据Xpath找到元素并点击, 无法实现
@@ -173,9 +173,11 @@ def play_video():
 
     # 新思路：直接hover到特定位置执行点击任务
     # 新思路2：先hover到父元素control_bar, 通过Xpath定位父元素, 通过css_selector从父元素定位子元素
-    time.sleep(10)
+    completely_close_task()
+    #time.sleep(10)
+    time.sleep(3)
     actions = ActionChains(driver)
-    ActionChains(driver).reset_actions()  # https://blog.csdn.net/weixin_45080737/article/details/134436893   move_by_offset()所执行的鼠标移动不是绝对坐标, 而是相对坐标
+    actions.reset_actions()  # https://blog.csdn.net/weixin_45080737/article/details/134436893   move_by_offset()所执行的鼠标移动不是绝对坐标, 而是相对坐标
     actions.move_by_offset(430, 250).click().perform()  
     #actions.move_by_offset(215, 125).click().perform()  # 可以播放, 但是不知道位置点到哪里了
     print("点击播放按钮成功")
@@ -230,7 +232,7 @@ def select_new_video():
     present_node = present_chapter[:3]
     print("当前学习章节: {}, 章节编号: {}, 正在跳转...".format(present_chapter, present_node))
     actions = ActionChains(driver)
-    ActionChains(driver).reset_actions()
+    actions.reset_actions()
     actions.move_by_offset(457, 596).perform() 
     control_bar = driver.find_element(By.XPATH, "/html/body/div[1]/div/div[2]/div[1]/div[2]/div[2]/div/div[10]")
     next = control_bar.find_element(By.CLASS_NAME, "nextButton")
@@ -242,18 +244,25 @@ def select_new_video():
 def cur_time():
     completely_close_task()
     actions = ActionChains(driver)
-    ActionChains(driver).reset_actions()
+    actions.reset_actions()
     actions.move_by_offset(457, 596).perform()
     #print("当前播放进度: {}".format())
-    return driver.find_element(By.XPATH, "/html/body/div[1]/div/div[2]/div[1]/div[2]/div[2]/div/div[10]/div[4]/span[1]").text
+    cur_time_info = WebDriverWait(driver, 20).until(
+        EC.presence_of_element_located((By.XPATH, "/html/body/div[1]/div/div[2]/div[1]/div[2]/div[2]/div/div[10]/div[4]/span[1]"))
+    )
+    return cur_time_info.text
     #return n_play_time_div.find_element(By.CSS_SELECTOR, ".currentTime").text
 
 def duration():
     completely_close_task()
     actions = ActionChains(driver)
-    ActionChains(driver).reset_actions()
+    actions.reset_actions()
     actions.move_by_offset(457, 596).perform()
-    return driver.find_element(By.XPATH, "/html/body/div[1]/div/div[2]/div[1]/div[2]/div[2]/div/div[10]/div[4]/span[2]").text
+    video_duration_info = WebDriverWait(driver, 20).until(
+        EC.presence_of_element_located((By.XPATH, "/html/body/div[1]/div/div[2]/div[1]/div[2]/div[2]/div/div[10]/div[4]/span[2]"))
+    )
+
+    return video_duration_info.text
     #return n_play_time_div.find_element(By.CSS_SELECTOR, ".duration").text
 
 def time_cal(time1, time2):
@@ -273,16 +282,42 @@ def time_cal(time1, time2):
     
     return diff_minutes
 
-def check_if_over():
-    cur = cur_time()
-    dur = duration()
-    #print("当前播放进度: {}/{}".format(cur, dur))
-    if cur == dur:
+# def check_if_over():
+#     cur = cur_time()
+#     dur = duration()
+#     #print("当前播放进度: {}/{}".format(cur, dur))
+#     if cur == dur:
+#         print("当前视频: {} 已经播放结束".format(present_video_title()))
+#         return True
+#     else:
+#         return False
+def check_if_over(cur, dur):
+    # 使用time库检测
+    if time_cal(cur, dur) < 2 / 60:
         print("当前视频: {} 已经播放结束".format(present_video_title()))
         return True
     else:
         return False
 
+def check_if_bar_refreshed():
+    if duration() is None or duration() == "00:00:00":
+        return False
+    return True
+
+def check_if_title_refreshed(title_temp):
+    if present_video_title() == title_temp:
+        return False
+    return True
+
+# def check_if_paused(last, cur):
+#     if last != cur:
+#         return False
+#     else:
+#         time.sleep(10)
+#         cur = cur_time()
+#         if last != cur:
+#             return False
+#         return True
 def read_the_last_line_of_cache():
     """
     检查是否存在 ./WebClassLoginCache/cache.txt 文件，并读取最后一行内容。
@@ -372,39 +407,46 @@ else:
     write_to_cache("未读取到上次学习时间或上次学习时间在一天前")
 
 # 登录智慧树官网
-driver.get("https://passport.zhihuishu.com/login#studentID")
+login_treenity_url = "https://passport.zhihuishu.com/login#studentID"
+driver.get(login_treenity_url)
 try:
     login_wisdom_tree()
 
     # 将滑块验证图片下载到本地通过opencv进行缺口位置分析
-    save_image()
-    # 对比两张图片，计算滑动距离
-    small_img_path = './image/slider_s.png'  # 滑块图（小图片）
-    big_img_path = './image/slider_b.png'   # 背景图（大图片）
-    distance = match(small_img_path, big_img_path)
-    #distance = distance / 320 * 300 + 22 # 先根据图片尺寸进行处理，然后加上调整参数20
-    distance = distance / 320 * 310 + 14# 先根据图片尺寸进行处理，然后加上调整参数20
-    # 移动
-    move(distance)
-    
+    check_if_login = False
+    login_attempt_left = 3      
+    while(not check_if_login):
+        save_image()
+        # 对比两张图片，计算滑动距离
+        small_img_path = './image/slider_s.png'  # 滑块图（小图片）
+        big_img_path = './image/slider_b.png'   # 背景图（大图片）
+        distance = match(small_img_path, big_img_path)
+        #distance = distance / 320 * 300 + 22 # 先根据图片尺寸进行处理，然后加上调整参数20
+        distance = distance / 320 * 310 + 14# 先根据图片尺寸进行处理，然后加上调整参数20
+        # 移动
+        move(distance)
+        check_if_login = check_if_redirected(driver, login_treenity_url, 20, 1)
+        login_attempt_left -= 1
+        if login_attempt_left == 0:
+            raise Exception("multiple login attempts timeout, please check your account name and password\n多次登录超时, 请检查账号或密码!")
     # 输出登录成功信息
 except Exception as e:
-    print(f"自动登录智慧树时发生错误: {e}")
+    write_to_cache("[Warning]: {}".format(e))
 
-# 等待页面跳转并进入学习界面
-print("正在跳转至学习界面")
-time.sleep(10)
-driver.get("https://studyvideoh5.zhihuishu.com/stuStudy?recruitAndCourseId=485f5d5c455f4859454a5859584d5c4258")
+webclass_url = "https://studyvideoh5.zhihuishu.com/stuStudy?recruitAndCourseId=485f5d5c455f4859454a5859584d5c4258"
+driver.get(webclass_url)
 try:
     # 找到关闭学习提示按钮
     # 无法直接用class或xpath定义，属于伪元素，参考https://blog.csdn.net/Z_shoushow/article/details/89499866
     # 复制父节点的selector路径
-    close_message_button = WebDriverWait(driver, 10).until(
+    close_message_button = WebDriverWait(driver, 20).until(
         EC.presence_of_element_located((By.CSS_SELECTOR, "#app > div > div:nth-child(6) > div.dialog-read > div.el-dialog__header > i"))
     )
     #ActionChains(driver).move_to_element(close_message_button).click().perform()
-    close_message_button.click()
-    #driver.execute_script("")
+    try: 
+        close_message_button.click()
+    except Exception as e:
+        write_to_cache("请先手动登录学习页面, 将最外层提示永久关闭!\n[Warning]{}".format(e))
     write_to_cache("关闭学习提示按钮成功")
 
     time.sleep(2)
@@ -419,28 +461,39 @@ try:
     print("正在等待进度条加载...")
     time.sleep(5)
     while(TotalTime <= 28-last_crash_play_time):
+        # 对于网速不好的时候, 需要增加等待时间, 以免CurTimePoint读取到未初始化的进度条时间(00:00:00)
+        while(not check_if_bar_refreshed()):
+            print("正在等待进度条加载...")
+            time.sleep(1)
         # 在新视频播放开头初始化计时器
         CurTimePoint = cur_time()
+        LastTimePoint = CurTimePoint
+        dur = duration()
         play_video()
-        print() 
-        while(not check_if_over() and TotalTime <= 28-last_crash_play_time):
+        print()
+        #is_the_video_over = False 
+        while(not check_if_over(CurTimePoint, dur) and TotalTime <= 28-last_crash_play_time):
             #completely_close_task()
             LastTimePoint = CurTimePoint
             CurTimePoint = cur_time()
             TotalTime += time_cal(LastTimePoint, CurTimePoint)
             print("已经播放{}分钟".format(TotalTime))
-            time.sleep(10)
+            time.sleep(10) # put into check_if_paused
+            if LastTimePoint == CurTimePoint:
+                print("检测到视频已经暂停, 正在尝试继续播放")
+                #play_video()
+            
         if(TotalTime >= 28-last_crash_play_time):
             break
-        present_title_temp = present_video_title
+        present_title_temp = present_video_title()
         write_to_cache("正在跳转至下一视频, 当前进度_{}, 当前学习时间{}分钟".format(present_title_temp, TotalTime))
         select_new_video()
+        present_title_temp = present_video_title()
     
-    write_to_cache("今日规律学习目标完成! 当前进度_{}".format(present_video_title()))        
+    write_to_cache("今日规律学习目标完成! 当前进度_{}".format(present_title_temp))        
     #time.sleep(60*60)
 except Exception as e:
-    #print(f"发生错误: {e}")
-    write_to_cache("{}\n{}: 发生错误! 当前进度_{}, 已经播放{}分钟".format(datetime.now().strftime('%Y-%m-%d %H:%M:%S'), e, present_title_temp, TotalTime))
+    write_to_cache("{}\n{}: 发生错误! 当前进度_{}, 已经播放{}分钟".format(e, datetime.now().strftime('%Y-%m-%d %H:%M:%S'), present_title_temp, TotalTime))
 
 # 关闭浏览器实例
 driver.quit()
