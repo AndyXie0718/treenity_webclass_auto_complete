@@ -1,11 +1,9 @@
-# 说明：依赖库selenium, opencv, requests
-# 安装指令: 
-# pip install selenium -i https://mirrors.aliyun.com/pypi/simple/
-# pip install opencv-python -i https://mirrors.aliyun.com/pypi/simple/
-# pip install requests -i https://mirrors.aliyun.com/pypi/simple/
 import time
 import os
-import requests
+#import re
+#import selenium
+#import requests
+from curl_cffi import requests
 import cv2
 import numpy as np
 from datetime import datetime
@@ -19,23 +17,99 @@ from selenium.common.exceptions import NoSuchElementException
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
-# 配置 Chrome 选项
-chrome_options = Options()
-chrome_options.add_argument('--ignore-certificate-errors')
-chrome_options.add_argument('--ignore-ssl-errors')
-#chrome_options.add_argument('--ignore-cache')   # 无视缓存
-#chrome_options.add_argument("--incognito") # 无痕模式
+def make_cache_file(cache_dir = './WebClassLoginCache', cache_file_name = 'cache'):
+    cache_path = cache_dir + '/' + cache_file_name + '.txt'
+    if not os.path.exists(cache_path):
+        if not os.path.exists(cache_dir):
+            os.makedirs(cache_dir)
+        with open(cache_path, 'w', encoding='utf-8') as file:
+            file.write("")  # 创建空文件
 
-# 启动浏览器实例
-service = Service(executable_path=r"D:\tools\ChromeDriver\chromedriver.exe")  # 指定 chromedriver 的路径
-try:
-    driver = webdriver.Chrome(service=service, options=chrome_options)
-except Exception as e:
-    print("没有正确安装chrome或者chromedriver, 错误信息如下:\n{}".format(e))
-    print("正在尝试为您启动edge")
-    driver = webdriver.Edge()
+def read_the_last_line_of_cache(cache_dir = './WebClassLoginCache', cache_file_name = 'cache'):
+    """
+    检查是否存在 ./WebClassLoginCache/cache.txt 文件，并读取最后一行内容。
+    如果文件不存在，则创建文件并返回空字符串。
+    
+    :return: 文件的最后一行内容（如果存在），否则返回空字符串
+    """
+    #cache_path = './WebClassLoginCache/cache.txt'
+    
+    # if not os.path.exists('./WebClassLoginCache'):
+    #     os.makedirs('./WebClassLoginCache')
+    
+    # if not os.path.exists(cache_path):
+    #     os.makedirs('./WebClassLoginCache')
+    #     with open(cache_path, 'w', encoding='utf-8') as file:
+    #         file.write("")  # 创建空文件
+    cache_path = cache_dir + '/' + cache_file_name + '.txt'
+    make_cache_file(cache_dir, cache_file_name)
 
-def login_wisdom_tree():
+    with open(cache_path, 'r', encoding='utf-8') as file:
+        lines = file.readlines()
+    
+    for line in reversed(lines):
+        if line.find("今日规律学习目标完成!") != -1 or line.find("发生错误") != -1 or line.find("sudo") != -1:
+            return line.strip()  # 返回最后一行内容并去除换行符
+    print("Cache Not Found, Start From DeFault _1.1")
+    return "[Warning] Cache Not Found, Start From DeFault _1.1"
+
+def write_to_cache(message, cache_dir = './WebClassLoginCache', cache_file_name = 'cache'):
+    """
+    在 cache.txt 文件中追加当前时间和给定的消息，并在每条消息前换行。
+    
+    :param message: 要追加的消息字符串
+    """
+    #cache_path = './WebClassLoginCache/cache.txt'
+    
+    # if not os.path.exists('./WebClassLoginCache'):
+    #     os.makedirs('./WebClassLoginCache')
+    
+    # if not os.path.exists(cache_path):
+    #     with open(cache_path, 'w', encoding='utf-8') as file:
+    #         file.write("")  # 创建空文件
+    cache_path = cache_dir + '/' + cache_file_name + '.txt'
+    make_cache_file(cache_dir, cache_file_name)
+
+    current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    log_message = f"{current_time}: {message}\n"
+    
+    print(log_message)
+    with open(cache_path, 'a', encoding='utf-8') as file:
+        file.write(log_message)
+
+def check_config(config_dict, cache_dir = './WebClassLoginCache', cache_file_name = 'user_config'):
+    cache_path = cache_dir + '/' + cache_file_name + '.txt'
+    make_cache_file(cache_dir, cache_file_name)
+
+    with open(cache_path, 'r', encoding='utf-8') as file:
+        lines = file.readlines()
+
+    for line in lines:
+        if not line:  # 跳过空行
+            continue
+        type = ""
+        for i, char in enumerate(line.strip()):
+            if char == ':':
+                data = line.strip()[i+1:]
+                config_dict[type] = data
+                break
+            type += char
+    if 'None' in config_dict.values(): 
+        write_to_cache("[Warning] Missing config info!\n警告: 用户信息不完整")
+        for key in config_dict:
+            if config_dict[key] == 'None':
+                config_dict[key] = input("请输入缺失信息{}: ".format(key))
+                write_config(key, config_dict[key])
+    #return config_dict
+
+def write_config(key, config_message, cache_dir = './WebClassLoginCache', cache_file_name = 'user_config'):
+    cache_path = cache_dir + '/' + cache_file_name + '.txt'
+    make_cache_file(cache_dir, cache_file_name)
+
+    with open(cache_path, 'a', encoding='utf-8') as file:
+        file.write("{}:{}\n".format(key, config_message))
+
+def login_wisdom_tree(config_dict):
     # # 切换到以“学校+学号”登录的方式(可直接访问https://passport.zhihuishu.com/login#studentID)
     # change_login_method_button = WebDriverWait(driver, 10).until(
     #     EC.element_to_be_clickable((By.XPATH, "/html/body/div[8]/div/div[2]/div[1]/a[2]"))
@@ -46,7 +120,8 @@ def login_wisdom_tree():
     school_name_input = WebDriverWait(driver, 10).until(
         EC.element_to_be_clickable((By.XPATH, "/html/body/div[8]/div/form/div[1]/ul[2]/li[1]/div/input[2]"))
     )
-    school_name_input.send_keys("湖南大学")
+    #school_name_input.send_keys("湖南大学")
+    school_name_input.send_keys(config_dict['school_name'])
     login_button = WebDriverWait(driver, 10).until(
         EC.element_to_be_clickable((By.XPATH, "/html/body/div[8]/div/form/div[1]/ul[2]/li[1]/div/div/div/div[1]/ul/li[2]"))
     )
@@ -55,12 +130,14 @@ def login_wisdom_tree():
     student_name_input = WebDriverWait(driver, 10).until(
         EC.element_to_be_clickable((By.XPATH, "/html/body/div[8]/div/form/div[1]/ul[2]/li[2]/input"))
     )
-    student_name_input.send_keys("")    # 在这里输入学号
+    #student_name_input.send_keys("202314010718")
+    student_name_input.send_keys(config_dict['student_id'])
 
     pwd_input = WebDriverWait(driver, 10).until(
         EC.element_to_be_clickable((By.XPATH, "/html/body/div[8]/div/form/div[1]/ul[2]/li[3]/input"))
     )
-    pwd_input.send_keys("")             # 在这里输入密码
+    #pwd_input.send_keys("163Zhi.com")
+    pwd_input.send_keys(config_dict['login_pwd'])
 
     # 找到登录按钮
     login_button = WebDriverWait(driver, 10).until(
@@ -72,18 +149,41 @@ def save_image():
     url_s = None
     url_b = None
     while(url_s is None or url_b is None):
-        print(url_s, url_b)
+        #print(url_s, url_b)
         time.sleep(1)
         # 小图片
         url_s = driver.find_element(By.CLASS_NAME, 'yidun_jigsaw').get_attribute('src')
         # 大图片
         url_b = driver.find_element(By.CLASS_NAME, 'yidun_bg-img').get_attribute('src')
 
-    header = {'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36'}
-
+    # url_s = WebDriverWait(driver, 20).until(
+    #     EC.presence_of_element_located((By.CLASS_NAME, 'yidun_jigsaw'))
+    # )
+    # url_s = url_s.get_attribute('src')
+    # url_b = WebDriverWait(driver, 20).until(
+    #     EC.presence_of_element_located((By.CLASS_NAME, 'yidun_bg-img'))
+    # )
+    # url_b = url_b.get_attribute('src')
+    #header = {'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36'}
+    header = {  
+    'accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',  
+    'accept-language': 'zh-CN,zh;q=0.9,en;q=0.8,en-GB;q=0.7,en-US;q=0.6',  
+    'cache-control': 'no-cache',  
+    'dnt': '1',  
+    'pragma': 'no-cache',  
+    'sec-ch-ua': '"Chromium";v="118", "Microsoft Edge";v="118", "Not=A?Brand";v="99"',  
+    'sec-ch-ua-mobile': '?0',  
+    'sec-ch-ua-platform': '"macOS"',  
+    'sec-fetch-dest': 'document',  
+    'sec-fetch-mode': 'navigate',  
+    'sec-fetch-site': 'same-origin',  
+    'sec-fetch-user': '?1',  
+    'upgrade-insecure-requests': '1',  
+    'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.0.0 Safari/537.36 Edg/118.0.2088.46',  
+}
     # 发送请求，获取验证码图片
-    response_s = requests.get(url_s, headers=header).content
-    response_b = requests.get(url_b, headers=header).content
+    response_s = requests.get(url_s, headers=header, impersonate="chrome110").content
+    response_b = requests.get(url_b, headers=header, impersonate="chrome110").content
 
     # 判断文件夹是否存在不存在则创建'
     os.makedirs('./image/', exist_ok=True)
@@ -138,16 +238,16 @@ def move(distance):
 
     action.drag_and_drop_by_offset(ele, xoffset=distance, yoffset=0).perform()
 
-    # # 定位到验证成功
-    # #这里 如果写time.sleep(2)会匹配失败，具体原因不知道
-    # time.sleep(1)
-    # loc = '.yidun_tips__text.yidun-fallback__tip'
-    # text = driver.find_element('css selector',loc).text
+def check_if_redirected(driver, initial_url, timeout, interval):
+    init_time = 0
+    while init_time < timeout:
+        if driver.current_url != initial_url:
+            write_to_cache("登录成功！正在跳转至学习网址...")
+            return True
 
-    # if text == "验证成功":
-    #     print("验证成功")
-    # else:
-    #     print("验证失败")
+        time.sleep(interval)
+        init_time += interval
+    return False
 
 def play_video():
     # 旧思路: 根据Xpath找到元素并点击, 无法实现
@@ -173,9 +273,11 @@ def play_video():
 
     # 新思路：直接hover到特定位置执行点击任务
     # 新思路2：先hover到父元素control_bar, 通过Xpath定位父元素, 通过css_selector从父元素定位子元素
-    time.sleep(10)
+    completely_close_task()
+    #time.sleep(10)
+    time.sleep(3)
     actions = ActionChains(driver)
-    ActionChains(driver).reset_actions()  # https://blog.csdn.net/weixin_45080737/article/details/134436893   move_by_offset()所执行的鼠标移动不是绝对坐标, 而是相对坐标
+    actions.reset_actions()  # https://blog.csdn.net/weixin_45080737/article/details/134436893   move_by_offset()所执行的鼠标移动不是绝对坐标, 而是相对坐标
     actions.move_by_offset(430, 250).click().perform()  
     #actions.move_by_offset(215, 125).click().perform()  # 可以播放, 但是不知道位置点到哪里了
     print("点击播放按钮成功")
@@ -217,9 +319,18 @@ def completely_close_task():
 def present_video_title():
     return driver.find_element(By.XPATH, "/html/body/div[1]/div/div[2]/div[1]/div[1]/div[1]/span[2]").text
 
+def get_video_node(title):
+    temp = ""
+    for i in range(len(title)):
+        if title[i] == '.' or title[i].isdigit():
+            temp += title[i]
+        else:
+            break
+    return temp
+
 def if_node_match(cache_node):
     present_chapter = present_video_title()
-    present_node = present_chapter[:3]
+    present_node = get_video_node(present_chapter)
     if present_node == cache_node:
         return True
     else:
@@ -227,14 +338,14 @@ def if_node_match(cache_node):
 
 def select_new_video():
     present_chapter = present_video_title()
-    present_node = present_chapter[:3]
+    present_node = get_video_node(present_chapter)
     print("当前学习章节: {}, 章节编号: {}, 正在跳转...".format(present_chapter, present_node))
     actions = ActionChains(driver)
-    ActionChains(driver).reset_actions()
+    actions.reset_actions()
     actions.move_by_offset(457, 596).perform() 
     control_bar = driver.find_element(By.XPATH, "/html/body/div[1]/div/div[2]/div[1]/div[2]/div[2]/div/div[10]")
     next = control_bar.find_element(By.CLASS_NAME, "nextButton")
-    actions.move_to_element(next).click().perform()  
+    actions.move_to_element(next).click().perform()
     print("点击下一章节按钮成功")
     time.sleep(10)
 
@@ -242,18 +353,25 @@ def select_new_video():
 def cur_time():
     completely_close_task()
     actions = ActionChains(driver)
-    ActionChains(driver).reset_actions()
+    actions.reset_actions()
     actions.move_by_offset(457, 596).perform()
     #print("当前播放进度: {}".format())
-    return driver.find_element(By.XPATH, "/html/body/div[1]/div/div[2]/div[1]/div[2]/div[2]/div/div[10]/div[4]/span[1]").text
+    cur_time_info = WebDriverWait(driver, 20).until(
+        EC.presence_of_element_located((By.XPATH, "/html/body/div[1]/div/div[2]/div[1]/div[2]/div[2]/div/div[10]/div[4]/span[1]"))
+    )
+    return cur_time_info.text
     #return n_play_time_div.find_element(By.CSS_SELECTOR, ".currentTime").text
 
 def duration():
     completely_close_task()
     actions = ActionChains(driver)
-    ActionChains(driver).reset_actions()
+    actions.reset_actions()
     actions.move_by_offset(457, 596).perform()
-    return driver.find_element(By.XPATH, "/html/body/div[1]/div/div[2]/div[1]/div[2]/div[2]/div/div[10]/div[4]/span[2]").text
+    video_duration_info = WebDriverWait(driver, 20).until(
+        EC.presence_of_element_located((By.XPATH, "/html/body/div[1]/div/div[2]/div[1]/div[2]/div[2]/div/div[10]/div[4]/span[2]"))
+    )
+
+    return video_duration_info.text
     #return n_play_time_div.find_element(By.CSS_SELECTOR, ".duration").text
 
 def time_cal(time1, time2):
@@ -273,68 +391,56 @@ def time_cal(time1, time2):
     
     return diff_minutes
 
-def check_if_over():
-    cur = cur_time()
-    dur = duration()
-    #print("当前播放进度: {}/{}".format(cur, dur))
-    if cur == dur:
+# def check_if_over():
+#     cur = cur_time()
+#     dur = duration()
+#     #print("当前播放进度: {}/{}".format(cur, dur))
+#     if cur == dur:
+#         print("当前视频: {} 已经播放结束".format(present_video_title()))
+#         return True
+#     else:
+#         return False
+def check_if_over(cur, dur):
+    # 使用time库检测
+    if time_cal(cur, dur) < 2 / 60:
         print("当前视频: {} 已经播放结束".format(present_video_title()))
         return True
     else:
         return False
 
-def read_the_last_line_of_cache():
-    """
-    检查是否存在 ./WebClassLoginCache/cache.txt 文件，并读取最后一行内容。
-    如果文件不存在，则创建文件并返回空字符串。
-    
-    :return: 文件的最后一行内容（如果存在），否则返回空字符串
-    """
-    cache_path = './WebClassLoginCache/cache.txt'
-    
-    if not os.path.exists('./WebClassLoginCache'):
-        os.makedirs('./WebClassLoginCache')
-    
-    if not os.path.exists(cache_path):
-        with open(cache_path, 'w', encoding='utf-8') as file:
-            file.write("")  # 创建空文件
-    
-    with open(cache_path, 'r', encoding='utf-8') as file:
-        lines = file.readlines()
-    
-    for line in reversed(lines):
-        if line.find("今日规律学习目标完成!") != -1 or line.find("发生错误") != -1 or line.find("sudo") != -1:
-            return line.strip()  # 返回最后一行内容并去除换行符
-    print("Cache Not Found, Start From DeFault _1.1")
-    return "[Warning] Cache Not Found, Start From DeFault _1.1"
+def check_if_bar_refreshed():
+    if duration() is None or duration() == "00:00:00":
+        return False
+    return True
+
+def check_if_title_refreshed(title_temp):
+    if present_video_title() == title_temp:
+        return False
+    return True
+
+# def check_if_paused(last, cur):
+#     if last != cur:
+#         return False
+#     else:
+#         time.sleep(10)
+#         cur = cur_time()
+#         if last != cur:
+#             return False
+#         return True
 
 
-def write_to_cache(message):
-    """
-    在 cache.txt 文件中追加当前时间和给定的消息，并在每条消息前换行。
-    
-    :param message: 要追加的消息字符串
-    """
-    cache_path = './WebClassLoginCache/cache.txt'
-    
-    if not os.path.exists('./WebClassLoginCache'):
-        os.makedirs('./WebClassLoginCache')
-    
-    if not os.path.exists(cache_path):
-        with open(cache_path, 'w', encoding='utf-8') as file:
-            file.write("")  # 创建空文件
-    
-    current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    log_message = f"{current_time}: {message}\n"
-    
-    print(log_message)
-    with open(cache_path, 'a', encoding='utf-8') as file:
-        file.write(log_message)
-
+# def find_node(message):
+#     for i in range(len(message)):
+#         if message[i] == '_':
+#             return message[i+1:i+4]
 def find_node(message):
+    head = -1
     for i in range(len(message)):
         if message[i] == '_':
-            return message[i+1:i+4]
+            head = i
+        elif not (message[i].isdigit() or message[i] == '.') and head != -1:
+            tail = i
+            return message[head+1:tail]
 
 #def timer():
 
@@ -355,8 +461,13 @@ def find_node(message):
 # except Exception as e:
 #     print(f"自动登录联通校园网时发生错误: {e}")
 
-# 这里输入文件目录
-os.chdir(r'')  # 一定加上这一句, 否则文件都存到系统默认用户目录了
+config_dict = {'student_id': 'None', 'login_pwd': 'None', 'school_name': 'None', 'default_browser': 'Chrome',
+                   'driver_path':'D:/tools/ChromeDriver/chromedriver.exe', 'login_treenity_url': 'https://passport.zhihuishu.com/login#studentID',
+                   'webclass_url': 'https://studyvideoh5.zhihuishu.com/stuStudy?recruitAndCourseId=485f5d5c455f4859454a5859584d5c4258', 
+                   'max_play_time': '25', 'auto_play': 'False', 'install_path': 'C:/WebClassAutoLogin'}
+os.chdir(config_dict['install_path'])  # 一定加上这一句, 否则文件都存到系统默认用户目录了
+#os.chdir(r'D:\Project\Python_lib\WebTest')  # 一定加上这一句, 否则文件都存到系统默认用户目录了
+check_config(config_dict)
 cache = read_the_last_line_of_cache()
 cur_node = find_node(cache)
 write_to_cache("上次学习进度: {}".format(cur_node))
@@ -371,76 +482,117 @@ else:
     last_crash_play_time = 0
     write_to_cache("未读取到上次学习时间或上次学习时间在一天前")
 
-# 登录智慧树官网
-driver.get("https://passport.zhihuishu.com/login#studentID")
-try:
-    login_wisdom_tree()
+# 配置 Chrome 选项
+chrome_options = Options()
+chrome_options.add_argument('--ignore-certificate-errors')
+chrome_options.add_argument('--ignore-ssl-errors')
+chrome_options.add_argument("--log-level=3")  # 设置日志级别，3 表示只显示严重错误
+#chrome_options.add_argument('--ignore-cache')   # 无视缓存
+#chrome_options.add_argument("--incognito") # 无痕模式
 
+# 启动浏览器实例
+driver_path = config_dict['driver_path']
+service = Service(executable_path=driver_path)  # 指定 chromedriver 的路径
+try:
+    driver = webdriver.Chrome(service=service, options=chrome_options)
+except Exception as e:
+    print("没有正确安装chrome或者chromedriver, 错误信息如下:\n{}".format(e))
+    print("正在尝试为您启动edge")
+    driver = webdriver.Edge()
+
+# 登录智慧树官网
+login_treenity_url = "https://passport.zhihuishu.com/login#studentID"
+driver.get(login_treenity_url)
+try:
+    login_wisdom_tree(config_dict)
     # 将滑块验证图片下载到本地通过opencv进行缺口位置分析
-    save_image()
-    # 对比两张图片，计算滑动距离
-    small_img_path = './image/slider_s.png'  # 滑块图（小图片）
-    big_img_path = './image/slider_b.png'   # 背景图（大图片）
-    distance = match(small_img_path, big_img_path)
-    #distance = distance / 320 * 300 + 22 # 先根据图片尺寸进行处理，然后加上调整参数20
-    distance = distance / 320 * 310 + 14# 先根据图片尺寸进行处理，然后加上调整参数20
-    # 移动
-    move(distance)
-    
+    check_if_login = False
+    login_attempt_left = 3      
+    while(not check_if_login):
+        save_image()
+        # 对比两张图片，计算滑动距离
+        small_img_path = './image/slider_s.png'  # 滑块图（小图片）
+        big_img_path = './image/slider_b.png'   # 背景图（大图片）
+        distance = match(small_img_path, big_img_path)
+        #distance = distance / 320 * 300 + 22 # 先根据图片尺寸进行处理，然后加上调整参数20
+        distance = distance / 320 * 310 + 14# 先根据图片尺寸进行处理，然后加上调整参数20
+        # 移动
+        move(distance)
+        check_if_login = check_if_redirected(driver, login_treenity_url, 20, 1)
+        login_attempt_left -= 1
+        if login_attempt_left == 0:
+            raise Exception("multiple login attempts timeout, please check your account name and password\n多次登录超时, 请检查账号或密码!")
     # 输出登录成功信息
 except Exception as e:
-    print(f"自动登录智慧树时发生错误: {e}")
+    write_to_cache("[Warning]: {}".format(e))
 
-# 等待页面跳转并进入学习界面
-print("正在跳转至学习界面")
-time.sleep(10)
-driver.get("https://studyvideoh5.zhihuishu.com/stuStudy?recruitAndCourseId=485f5d5c455f4859454a5859584d5c4258")
+webclass_url = "https://studyvideoh5.zhihuishu.com/stuStudy?recruitAndCourseId=485f5d5c455f4859454a5859584d5c4258"
+driver.get(webclass_url)
 try:
     # 找到关闭学习提示按钮
     # 无法直接用class或xpath定义，属于伪元素，参考https://blog.csdn.net/Z_shoushow/article/details/89499866
     # 复制父节点的selector路径
-    close_message_button = WebDriverWait(driver, 10).until(
+    close_message_button = WebDriverWait(driver, 20).until(
         EC.presence_of_element_located((By.CSS_SELECTOR, "#app > div > div:nth-child(6) > div.dialog-read > div.el-dialog__header > i"))
     )
     #ActionChains(driver).move_to_element(close_message_button).click().perform()
-    close_message_button.click()
-    #driver.execute_script("")
+    try: 
+        close_message_button.click()
+    except Exception as e:
+        write_to_cache("请先手动登录学习页面, 将最外层提示永久关闭!\n[Warning]{}".format(e))
     write_to_cache("关闭学习提示按钮成功")
-
     time.sleep(2)
+    present_title_temp = present_video_title()
     while(not if_node_match(cur_node)):
         select_new_video()
+        present_title_temp = present_video_title()
         #play_video()
+
+    while(not check_if_bar_refreshed()):
+        time.sleep(1)
 
     present_title_temp = present_video_title()
     write_to_cache("已成功跳转至昨日进度! 当前进度_{}".format(present_title_temp))
-    TotalTime = 0
-    # 对于网速不好的时候, 需要增加等待时间, 以免CurTimePoint读取到未初始化的进度条时间(00:00:00)
-    print("正在等待进度条加载...")
+    #TotalTime = 0  # cannot handle multiple crashes
+    TotalTime = last_crash_play_time
+    #max_play_time = 25
+    max_play_time = int(config_dict['max_play_time'])
+
     time.sleep(5)
-    while(TotalTime <= 28-last_crash_play_time):
+    while(TotalTime <= max_play_time):
+        # 对于网速不好的时候, 需要增加等待时间, 以免CurTimePoint读取到未初始化的进度条时间(00:00:00)
+        while(not check_if_bar_refreshed()):
+            print("正在等待进度条加载...")
+            time.sleep(1)
         # 在新视频播放开头初始化计时器
         CurTimePoint = cur_time()
+        LastTimePoint = CurTimePoint
+        dur = duration()
         play_video()
-        print() 
-        while(not check_if_over() and TotalTime <= 28-last_crash_play_time):
+        print()
+        #is_the_video_over = False 
+        while(not check_if_over(CurTimePoint, dur) and TotalTime <= max_play_time):
             #completely_close_task()
             LastTimePoint = CurTimePoint
             CurTimePoint = cur_time()
             TotalTime += time_cal(LastTimePoint, CurTimePoint)
             print("已经播放{}分钟".format(TotalTime))
-            time.sleep(10)
-        if(TotalTime >= 28-last_crash_play_time):
+            time.sleep(10) # put into check_if_paused
+            if LastTimePoint == CurTimePoint:
+                print("检测到视频已经暂停, 正在尝试继续播放")
+                #play_video()
+            
+        if(TotalTime >= max_play_time):
             break
-        present_title_temp = present_video_title
+        present_title_temp = present_video_title()
         write_to_cache("正在跳转至下一视频, 当前进度_{}, 当前学习时间{}分钟".format(present_title_temp, TotalTime))
         select_new_video()
+        present_title_temp = present_video_title()
     
-    write_to_cache("今日规律学习目标完成! 当前进度_{}".format(present_video_title()))        
+    write_to_cache("今日规律学习目标完成! 当前进度_{}".format(present_title_temp))        
     #time.sleep(60*60)
 except Exception as e:
-    #print(f"发生错误: {e}")
-    write_to_cache("{}\n{}: 发生错误! 当前进度_{}, 已经播放{}分钟".format(datetime.now().strftime('%Y-%m-%d %H:%M:%S'), e, present_title_temp, TotalTime))
+    write_to_cache("{}\n{}: 发生错误! 当前进度_{}, 已经播放{}分钟".format(e, datetime.now().strftime('%Y-%m-%d %H:%M:%S'), present_title_temp, TotalTime))
 
 # 关闭浏览器实例
 driver.quit()
