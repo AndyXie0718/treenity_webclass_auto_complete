@@ -2,8 +2,8 @@ import time
 import os
 #import re
 #import selenium
-#import requests
-from curl_cffi import requests
+import requests
+#from curl_cffi import requests
 import cv2
 import numpy as np
 from datetime import datetime
@@ -120,7 +120,6 @@ def login_wisdom_tree(config_dict):
     school_name_input = WebDriverWait(driver, 10).until(
         EC.element_to_be_clickable((By.XPATH, "/html/body/div[8]/div/form/div[1]/ul[2]/li[1]/div/input[2]"))
     )
-    #school_name_input.send_keys("湖南大学")
     school_name_input.send_keys(config_dict['school_name'])
     login_button = WebDriverWait(driver, 10).until(
         EC.element_to_be_clickable((By.XPATH, "/html/body/div[8]/div/form/div[1]/ul[2]/li[1]/div/div/div/div[1]/ul/li[2]"))
@@ -130,13 +129,13 @@ def login_wisdom_tree(config_dict):
     student_name_input = WebDriverWait(driver, 10).until(
         EC.element_to_be_clickable((By.XPATH, "/html/body/div[8]/div/form/div[1]/ul[2]/li[2]/input"))
     )
-    #student_name_input.send_keys("202314010718")
+
     student_name_input.send_keys(config_dict['student_id'])
 
     pwd_input = WebDriverWait(driver, 10).until(
         EC.element_to_be_clickable((By.XPATH, "/html/body/div[8]/div/form/div[1]/ul[2]/li[3]/input"))
     )
-    #pwd_input.send_keys("163Zhi.com")
+
     pwd_input.send_keys(config_dict['login_pwd'])
 
     # 找到登录按钮
@@ -164,26 +163,11 @@ def save_image():
     #     EC.presence_of_element_located((By.CLASS_NAME, 'yidun_bg-img'))
     # )
     # url_b = url_b.get_attribute('src')
-    #header = {'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36'}
-    header = {  
-    'accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',  
-    'accept-language': 'zh-CN,zh;q=0.9,en;q=0.8,en-GB;q=0.7,en-US;q=0.6',  
-    'cache-control': 'no-cache',  
-    'dnt': '1',  
-    'pragma': 'no-cache',  
-    'sec-ch-ua': '"Chromium";v="118", "Microsoft Edge";v="118", "Not=A?Brand";v="99"',  
-    'sec-ch-ua-mobile': '?0',  
-    'sec-ch-ua-platform': '"macOS"',  
-    'sec-fetch-dest': 'document',  
-    'sec-fetch-mode': 'navigate',  
-    'sec-fetch-site': 'same-origin',  
-    'sec-fetch-user': '?1',  
-    'upgrade-insecure-requests': '1',  
-    'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.0.0 Safari/537.36 Edg/118.0.2088.46',  
-}
+    header = {'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36'}
+    
     # 发送请求，获取验证码图片
-    response_s = requests.get(url_s, headers=header, impersonate="chrome110").content
-    response_b = requests.get(url_b, headers=header, impersonate="chrome110").content
+    response_s = requests.get(url_s, headers=header).content
+    response_b = requests.get(url_b, headers=header).content
 
     # 判断文件夹是否存在不存在则创建'
     os.makedirs('./image/', exist_ok=True)
