@@ -459,6 +459,29 @@ def activate(config_dict):
     webclass_url = config_dict['webclass_url']
     driver.get(webclass_url)
     try:
+        # 25/1/12 课程学习已经关闭, 需要新关闭一个确认弹窗
+        close_message_button_1 = WebDriverWait(driver, 20).until(
+            EC.presence_of_element_located((By.XPATH, "/html/body/div[1]/div/div[3]/div/div[3]/span/button"))
+        )
+        try: 
+            close_message_button_1.click()
+        except Exception as e:
+            write_to_cache("关闭失败!\n[ERROR]{}".format(e))
+
+        # 找到关闭学习提示按钮
+        # 无法直接用class或xpath定义，属于伪元素，参考https://blog.csdn.net/Z_shoushow/article/details/89499866
+        # 复制父节点的selector路径
+        close_message_button_2 = WebDriverWait(driver, 20).until(
+            EC.presence_of_element_located((By.CSS_SELECTOR, "#app > div > div:nth-child(6) > div.dialog-read > div.el-dialog__header > i"))
+        )
+        #ActionChains(driver).move_to_element(close_message_button).click().perform()
+        try: 
+            close_message_button_2.click()
+        except Exception as e:
+            write_to_cache("请先手动登录学习页面, 将最外层提示永久关闭!\n[Warning]{}".format(e))
+        write_to_cache("关闭学习提示按钮成功")
+        time.sleep(2)
+
         # 找到关闭学习提示按钮
         # 无法直接用class或xpath定义，属于伪元素，参考https://blog.csdn.net/Z_shoushow/article/details/89499866
         # 复制父节点的selector路径
