@@ -530,7 +530,7 @@ def activate(config_dict):
 
 # ### class for user gui
 
-def show_settings_popup(config_dict, sub_width = 600, sub_height = 300):
+def show_settings_popup(config_dict: dict, sub_width = 600, sub_height = 300):
     '''
     create a subwindow for users to change user configuration
 
@@ -549,13 +549,12 @@ def show_settings_popup(config_dict, sub_width = 600, sub_height = 300):
     popup.title("设置")
     popup.geometry(f"{sub_width}x{sub_height}")  # 宽度x高度
 
-    def make_setting_statement(node, text, default_message, entry_temp, adjust_coef = 2):
+    def make_setting_statement(node, text, default_message, entry_temp: list, adjust_coef = 2):
         # 创建一个标签
         label = tk.Label(popup, text=text)
         label.place(relx=0.01*kx, rely=0.03*ky*node*adjust_coef)
 
         # 创建一个输入框
-        message = default_message
         entry = tk.Entry(popup, width=50)
         entry.place(relx=0.22*kx, rely=0.03*ky*node*adjust_coef)
         entry.insert(0, default_message)
@@ -592,6 +591,37 @@ def show_settings_popup(config_dict, sub_width = 600, sub_height = 300):
     #popup.focus_force()  # 强制弹出窗口获得焦点
     popup.wait_window()  # 等待弹出窗口关闭
 
+def deactivation_popup(cur_thread:threading.Thread, sub_width = 200, sub_height = 100):
+    '''
+    create a subwindow for users to close current activation threading
+
+    :param: `subwidth`: the width of the subwindow
+
+        `sub_height`: the height of the subwindow
+
+    '''
+    def exit_application(cur_thread:threading.Thread):
+        # 等待激活线程结束
+        if cur_thread.is_alive():
+            cur_thread.join()
+
+    
+    popup = tk.Toplevel(root)
+    # 禁用窗口右上角的关闭按钮
+    popup.protocol("WM_DELETE_WINDOW", lambda: None)
+    popup.title("关闭该进程")
+    popup.geometry(f"{sub_width}x{sub_height}")  # 宽度x高度
+    
+    # 创建一个提交按钮
+    submit_button = tk.Button(popup, text="确定", command=lambda: [exit_application(cur_thread), console_log("成功关闭该进程"), popup.destroy()])
+    submit_button.place(relx=0.45, rely=0.5)
+
+    # 弹出窗口设置
+    popup.transient(root)  # 使弹出窗口依赖于主窗口
+    popup.grab_set()  # 使弹出窗口获得焦点，并阻止用户与主窗口交互
+    #popup.focus_force()  # 强制弹出窗口获得焦点
+    popup.wait_window()  # 等待弹出窗口关闭
+
 def set_install_session(config_dict):
     '''
     set the install_path of the exe, shown in mainwindow and is never closed
@@ -603,7 +633,7 @@ def set_install_session(config_dict):
     # 创建一个输入框
     install_path = 'C:/WebClassAutoLogin'
     entry = tk.Entry(root, width=50)
-    entry.place(relx=0.22, rely=0.035)
+    entry.place(relx=0.22, rely=0.03)
     entry.insert(0, install_path)
 
     # 创建一个选择目录按钮，并绑定处理函数
@@ -680,8 +710,11 @@ def start_activation():
     # 创建一个新的线程来运行 activate 函数
     activation_thread = threading.Thread(target=lambda: activate(config_dict))
     activation_thread.start()
+    # 在一个线程内关闭自己导致死锁 
+    #deactivation_popup(activation_thread)
+
 #settings_button = tk.Button(root, text="启动", command=lambda: activate(config_dict))
-settings_button = tk.Button(root, text="启动", command=lambda: start_activation())
+settings_button = tk.Button(root, text="启动", command=lambda: [start_activation()])
 settings_button.place(relx=0.8, rely=0.1)
 
 # 创建一个文本框来显示安装信息，并设置 state 为 DISABLED
